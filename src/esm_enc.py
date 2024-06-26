@@ -207,3 +207,13 @@ def load_esm_model(encoder_name:str)->Tuple[esm.model.esm2.ESM2,esm.data.Alphabe
     if encoder_name=="esm2_t48_15b_ur50d":
         return esm.pretrained.esm2_t48_15B_UR50D()   
     raise KeyError("Model {} not found".format(encoder_name))
+
+
+encoder_names = [
+    'esm2_t6_8m_ur50d',
+    'esm2_t12_35m_ur50d',
+    'esm2_t30_150m_ur50d',
+    'esm2_t33_650m_ur50d',
+    'esm2_t36_3b_ur50d',
+    'esm2_t48_15b_ur50d'
+]
