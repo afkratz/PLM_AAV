@@ -39,8 +39,8 @@ import os
 from typing import Tuple,List,Union
 
 
-rootdir = Path(__file__).resolve().parent.parent
-cachedir = os.path.join(rootdir,'.tensor_cache')
+root_dir = Path(__file__).resolve().parent.parent
+cache_dir = os.path.join(root_dir,'.tensor_cache')
 
 class ESM_Encoder():
     def __init__(self,encoder_name:str):
@@ -55,13 +55,13 @@ class ESM_Encoder():
         self.alphabet = alphabet
 
         self.token_rep_cache=tensorcache.TensorCache(
-            os.path.join(cachedir,self.encoder_name,'token_rep')
+            os.path.join(cache_dir,self.encoder_name,'token_rep')
         )
         self.token_pll_cache=tensorcache.TensorCache(
-            os.path.join(cachedir,self.encoder_name,'token_pll')
+            os.path.join(cache_dir,self.encoder_name,'token_pll')
         )
         self.total_pll_cache=tensorcache.TensorCache(
-            os.path.join(cachedir,self.encoder_name,'total_pll')
+            os.path.join(cache_dir,self.encoder_name,'total_pll')
         )
 
     def to(self,dev: Union[str,int]):
