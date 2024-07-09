@@ -57,12 +57,19 @@ class ESM_Encoder():
         self.token_rep_cache=tensorcache.TensorCache(
             os.path.join(cache_dir,self.encoder_name,'token_rep')
         )
+
+        self.averaged_rep_cache=tensorcache.TensorCache(
+            os.path.join(cache_dir,self.encoder_name,'averaged_rep')
+        )
+
         self.token_pll_cache=tensorcache.TensorCache(
             os.path.join(cache_dir,self.encoder_name,'token_pll')
         )
+
         self.total_pll_cache=tensorcache.TensorCache(
             os.path.join(cache_dir,self.encoder_name,'total_pll')
         )
+        
 
     def to(self,dev: Union[str,int]):
         self.device=dev
@@ -77,24 +84,43 @@ class ESM_Encoder():
     def drop_esm(self):
         self.esm=None
 
-    def encode(self,seqs:List[str])->Tuple[torch.tensor,torch.tensor,torch.tensor]:
+    def use_ramcache(self,setting):
+        self.token_rep_cache.use_ramcache(setting)
+        self.token_pll_cache.use_ramcache(setting)
+        self.total_pll_cache.use_ramcache(setting)
+        
+    
+    def encode(self,
+               seqs:List[str],
+               return_reps:bool,
+               return_averaged_reps:bool,
+               return_token_pll:bool,
+               return_total_pll:bool,
+               )->Tuple[torch.tensor,torch.tensor,torch.tensor,torch.tensor]:
         """
         Encode a list of proteins
         If proteins are all of one length, uses encode_fl
         If proteins are of variable length, uses encode_vl and returns embeddings padded with zeros
         to make all embeddings equal length
 
-        Returns (token_rep,token_pll,total_pll)
+        Returns (token_rep,averaged_rep,token_pll,total_pll), or None for values where the parameter is False
         """
         if isinstance(seqs,str):
             seqs=[seqs]
 
         if len(set(map(lambda s:len(s),seqs)))==1:#If all sequences are the same length:
-            return self.encode_fl(seqs)
+            return self.encode_fl(seqs,return_reps,return_averaged_reps,return_token_pll,return_total_pll)
         else:
-            return self.encode_vl(seqs)
+            return self.encode_vl(seqs,return_reps,return_averaged_reps,return_token_pll,return_total_pll)
 
-    def encode_fl(self,seqs:List[str])->Tuple[torch.tensor,torch.tensor,torch.tensor]:
+    def encode_fl(self,
+               seqs:List[str],
+               return_reps:bool,
+               return_averaged_reps:bool,
+               return_token_pll:bool,
+               return_total_pll:bool,
+               )->Tuple[torch.tensor,torch.tensor,torch.tensor,torch.tensor]:
+
         if isinstance(seqs,str):
             seqs=[seqs]
 
@@ -106,14 +132,37 @@ class ESM_Encoder():
         if need_to_encode:
             self.add_to_cache(need_to_encode)
 
-        token_rep = torch.stack(list(map(self.token_rep_cache.read,seqs))).to(self.device)
-        token_pll = torch.stack(list(map(self.token_pll_cache.read,seqs))).to(self.device).unsqueeze(-1)
-        total_pll = torch.stack(list(map(self.total_pll_cache.read,seqs))).to(self.device)
+        if return_reps:
+            token_rep = torch.stack(list(map(self.token_rep_cache.read,seqs))).to(self.device)
+        else:
+            token_rep = None
+
+        if return_averaged_reps:
+            averaged_rep = torch.stack(list(map(self.averaged_rep_cache.read,seqs))).to(self.device)
+        else:averaged_rep=None
+
+        if return_token_pll:
+            token_pll = torch.stack(list(map(self.token_pll_cache.read,seqs))).to(self.device).unsqueeze(-1)
+        else:
+            token_pll = None
+
+
+        if return_total_pll:
+            total_pll = torch.stack(list(map(self.total_pll_cache.read,seqs))).to(self.device)
+        else:
+            total_pll=None
         
-        return token_rep,token_pll,total_pll
+        return token_rep,averaged_rep,token_pll,total_pll
 
 
-    def encode_vl(self,seqs:List[str])->Tuple[torch.tensor,torch.tensor,torch.tensor]:
+    def encode_vl(self,
+               seqs:List[str],
+               return_reps:bool,
+               return_averaged_reps:bool,
+               return_token_pll:bool,
+               return_total_pll:bool,
+               )->Tuple[torch.tensor,torch.tensor,torch.tensor,torch.tensor]:
+    
         if isinstance(seqs,str):
             seqs=[seqs]
 
@@ -132,27 +181,45 @@ class ESM_Encoder():
         
         max_length = max(map(lambda s:len(s),seqs))
 
-        token_reps = list()
-        token_plls = list()
-        for s in seqs:
-            rep = self.token_rep_cache.read(s)
-            token_pll = self.token_pll_cache.read(s)
-            
-            sequence_length = len(rep)
-            if sequence_length != max_length:
-                #Pad takes 2N arguments, where the first two are the padding for the last dimension in the front and back
-                #Then the next two are the padding for the second to last dimension, front and back
-                rep = torch.nn.functional.pad(rep,(0,0,0,max_length - sequence_length))
-                token_pll = torch.nn.functional.pad(token_pll,(0,max_length - sequence_length))
-            token_reps.append(rep)
-            token_plls.append(token_pll)
+        if return_token_pll or return_reps:
+            token_reps = list()
+            token_plls = list()
+            for s in seqs:
+                if return_reps:rep = self.token_rep_cache.read(s)
+                if return_token_pll:token_pll = self.token_pll_cache.read(s)
+                
+                sequence_length = len(rep)
+                if sequence_length != max_length:
+                    #Pad takes 2N arguments, where the first two are the padding for the last dimension in the front and back
+                    #Then the next two are the padding for the second to last dimension, front and back
+                    if return_reps:rep = torch.nn.functional.pad(rep,(0,0,0,max_length - sequence_length))
+                    if return_token_pll:token_pll = torch.nn.functional.pad(token_pll,(0,max_length - sequence_length))
+                if return_reps:token_reps.append(rep)
+                if return_token_pll:token_plls.append(token_pll)
         
 
-        token_rep = torch.stack(token_reps).to(self.device)
-        token_pll = torch.stack(token_plls).to(self.device).unsqueeze(-1)
-        total_pll = torch.stack(list(map(self.total_pll_cache.read,seqs))).to(self.device)
+        if return_reps:
+            token_rep = torch.stack(token_reps).to(self.device)
+        else:
+            token_rep = None
 
-        return token_rep,token_pll,total_pll
+        if return_averaged_reps:
+            averaged_rep = torch.stack(list(map(self.averaged_rep_cache.read,seqs))).to(self.device)
+        else:
+            averaged_rep=None
+
+        if return_token_pll:
+            token_pll = torch.stack(token_plls).to(self.device).unsqueeze(-1)
+        else:
+            token_pll = None
+
+
+        if return_total_pll:
+            total_pll = torch.stack(list(map(self.total_pll_cache.read,seqs))).to(self.device)
+        else:
+            total_pll=None
+        
+        return token_rep,averaged_rep,token_pll,total_pll
 
     
     def add_to_cache(self,seqs:List[str]):
@@ -178,6 +245,7 @@ class ESM_Encoder():
 
         #[:,1:-1] to exclude  <cls> and <eos>
         token_reps = esm_output['representations'][self.esm.num_layers][:,1:-1]
+        averaged_rep = torch.sum(token_reps,dim=1)
         logits = esm_output['logits']
         smax = torch.nn.Softmax(dim=2)
         scaled_logits = smax(logits)[:,1:-1]
@@ -187,6 +255,7 @@ class ESM_Encoder():
         total_pll = token_pll.mean(axis=1).unsqueeze(1)
         for i in range(len(seqs)):
             self.token_rep_cache.write(seqs[i],token_reps[i])
+            self.averaged_rep_cache.write(seqs[i],averaged_rep[i])
             self.token_pll_cache.write(seqs[i],token_pll[i])
             self.total_pll_cache.write(seqs[i],total_pll[i])
 
@@ -215,5 +284,5 @@ encoder_names = [
     'esm2_t30_150m_ur50d',
     'esm2_t33_650m_ur50d',
     'esm2_t36_3b_ur50d',
-    'esm2_t48_15b_ur50d'
+    'esm2_t48_15b_ur50d' # Too big to run on most machines
 ]

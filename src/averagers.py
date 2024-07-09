@@ -37,14 +37,11 @@ class SimpleAverager(torch.nn.Module):
         self.embed_dim = self.encoder.embed_dim + int(use_pll)
 
     def forward(self,x:List[str])->torch.tensor:
-        token_reps,token_pll,_ = self.encoder.encode(x)    
+        _,averaged_reps,_,total_pll = self.encoder.encode(x,return_reps=False,return_averaged_reps=True,return_token_pll=False,return_total_pll=self.use_pll)
         if self.use_pll:
-            return torch.sum(
-                torch.cat((token_reps,token_pll),dim=-1),
-                dim=1
-                )
+            return torch.cat((averaged_reps,total_pll),dim=-1)
         else:
-            return torch.sum(token_reps,dim=1)
+            return averaged_reps
     
     def to(self,dev):
         self.encoder.to(dev)
@@ -87,8 +84,12 @@ class LearnableAverager(torch.nn.Module):
         self.encoder.to(dev)
 
     def forward(self,x:List[str])->torch.tensor:
-        token_reps,token_pll,total_pll = self.encoder.encode(x)
-        
+        token_reps,_,token_pll,total_pll = self.encoder.encode(x,
+                                                               return_reps=True,
+                                                               return_averaged_reps=False,
+                                                               return_token_pll=self.use_token_pll,
+                                                               return_total_pll=self.use_total_pll)
+
         if self.use_token_pll:
             rep = torch.cat((token_reps,token_pll),dim=-1)
         else:
@@ -100,6 +101,7 @@ class LearnableAverager(torch.nn.Module):
         )
         if self.use_total_pll:
             output = torch.cat((output,total_pll),dim=-1)
+
         return output
     
 
@@ -122,7 +124,6 @@ class SimpleAveragerDense(torch.nn.Module):
             bias=False
         )
 
-
     def get_device(self):
         return next(self.parameters()).device
 
@@ -137,6 +138,9 @@ class SimpleAveragerDense(torch.nn.Module):
         self.sav.to(dev)
         self.denseblock.to(dev)
         self.final.to(dev)
+    
+    def use_ramcache(self,setting):
+        self.sav.encoder.use_ramcache(setting)
 
 class LearnableAveragerDense(torch.nn.Module):
     def __init__(self,**kwargs):
@@ -172,3 +176,6 @@ class LearnableAveragerDense(torch.nn.Module):
         self.lav.to(dev)
         self.denseblock.to(dev)
         self.final.to(dev)
+
+    def use_ramcache(self,setting):
+        self.lav.encoder.use_ramcache(setting)

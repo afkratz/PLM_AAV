@@ -38,6 +38,8 @@ class TensorCache:
         self._cachedir   = cachedir
         self._cachemapfp = os.path.join(cachedir, "cachemap.csv")
         self._cachemap   = dict()
+        self._ramcache = dict()
+        self._using_ramcache=False
         if os.path.exists(self._cachemapfp):
             self._cachemap = self._readCacheMap()
 
@@ -95,7 +97,10 @@ class TensorCache:
             raise ValueError("key {} is not cached".format(key))
         return os.path.join(self._cachedir, self._cachemap[key])
 
-
+    def use_ramcache(self,setting:bool):
+        if setting == False:
+            self._ramcache.clear()
+        self._using_ramcache=setting
 
     def isCached(self, key : str) -> bool:
         if self._cachemap is None:
@@ -103,6 +108,11 @@ class TensorCache:
         return key in self._cachemap
 
     def read(self, key : str) -> torch.Tensor:
+        if self._using_ramcache:
+            if key not in self._ramcache:
+                self._ramcache[key]=torch.load(self._getTensorCachePath(key)).cpu()
+            return self._ramcache[key]               
+        
         return torch.load(self._getTensorCachePath(key)).cpu()
 
     def write(
@@ -129,3 +139,5 @@ class TensorCache:
             obj=val.cpu(),
             f=self._getTensorCachePath(key)
             )
+
+        

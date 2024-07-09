@@ -27,6 +27,8 @@ def load_c1()->dataset.dms_dataset:
             'single_processed.csv'
         )
     )
+    df=df[df['viral_selection']!=float('-inf')]
+    df=df[df['viral_selection']!=float('inf')]
     return dataset.dms_dataset(
         seqs = df['full_sequence'].to_list(),
         scores = df['viral_selection'].to_list(),
@@ -41,6 +43,8 @@ def load_r2()->dataset.dms_dataset:
             'random_doubles_processed.csv'
         )
     )
+    df=df[df['viral_selection']!=float('-inf')]
+    df=df[df['viral_selection']!=float('inf')]
     return dataset.dms_dataset(
         seqs = df['full_sequence'].to_list(),
         scores = df['viral_selection'].to_list(),
@@ -54,6 +58,9 @@ def load_r10()->dataset.dms_dataset:
             'random_up_to_ten_processed.csv'
         )
     )
+    df=df[df['viral_selection']!=float('-inf')]
+    df=df[df['viral_selection']!=float('inf')]
+    
     return dataset.dms_dataset(
         seqs = df['full_sequence'].to_list(),
         scores = df['viral_selection'].to_list(),
@@ -67,6 +74,8 @@ def load_a39()->dataset.dms_dataset:
             'additive_designed_processed.csv'
         )
     )
+    df=df[df['viral_selection']!=float('-inf')]
+    df=df[df['viral_selection']!=float('inf')]
     return dataset.dms_dataset(
         seqs = df['full_sequence'].to_list(),
         scores = df['viral_selection'].to_list(),
