@@ -4,7 +4,7 @@
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-MIT License
+OptiProt Academic License
 esm_enc.py
 --------------------------------------------------------------------------------
 Contains class to wrap around ESM protein language models.
@@ -284,5 +284,5 @@ encoder_names = [
     'esm2_t30_150m_ur50d',
     'esm2_t33_650m_ur50d',
     'esm2_t36_3b_ur50d',
-    'esm2_t48_15b_ur50d' # Too big to run on most machines
+    'esm2_t48_15b_ur50d' # Too big to run on my machine
 ]

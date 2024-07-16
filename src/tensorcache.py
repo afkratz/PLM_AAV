@@ -4,7 +4,7 @@
 --------------------------------------------------------------------------------
 Copyright 2023 Benjamin Alexander Albert [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
+OptiProt Academic License
 tensorcache.py
 --------------------------------------------------------------------------------
 

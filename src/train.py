@@ -4,9 +4,10 @@
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
-train_utils.py
+OptiProt Academic License
+train.py
 --------------------------------------------------------------------------------
+
 """
 
 

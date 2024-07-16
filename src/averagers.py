@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
+
 """
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
+OptiProt Academic License
 averagers.py
 --------------------------------------------------------------------------------
 """
-
-from pathlib import Path
 
 import torch
 

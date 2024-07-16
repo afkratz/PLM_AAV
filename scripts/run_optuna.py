@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
+OptiProt Academic License
 run_optuna.py
 --------------------------------------------------------------------------------
 """
@@ -13,11 +14,14 @@ import sys
 from pathlib import Path
 from typing import Callable,Tuple,Dict
 from abc import ABC,abstractmethod
-
+import pandas as pd
 import torch
 import numpy as np
 import optuna
 from torch.nn.modules import Module
+
+from sklearn.metrics import roc_auc_score
+
 
 root_dir = Path(__file__).resolve().parent.parent
 log_dir = os.path.join(root_dir,'logs')
@@ -29,7 +33,7 @@ from src import dataset
 from src import averagers
 from src import train
 
-REPLICATES_PER_TRIAL = 3
+REPLICATES_PER_TRIAL = 5
 
 
 class OptunaModel(ABC):
@@ -133,7 +137,6 @@ def train_model(
         factor=0.5,
         patience=5,
         )
-    
     return train.train_model(
         model,
         training_data=train_data,
@@ -164,7 +167,7 @@ def task_wrapper(
                             epochs=parameters['epochs'])
         corr = train.get_corr(model,eval_data=val_data,batch_size=128)
         corrs.append(corr)
-    log_file = "optuna_log_{}_{}".format(
+    log_file = "optuna_log_{}_{}.csv".format(
         optunamodel.get_model_name(),
         dataset_name)
     write_log(log_file,trial,np.mean(corrs))
@@ -185,6 +188,12 @@ def load_c1r2(replicate:int)->Tuple[dataset.dms_dataset,dataset.dms_dataset,str]
     train_data.extend(r2)
     return (train_data,val_data,'c1r2')
 
+def load_c1r2_data()->Dict[str,dataset.dms_dataset]:
+    return{
+        'lr_c1r2':load_datasets.load_lr_c1r2(),
+        'cnn_c1r2':load_datasets.load_cnn_c1r2(),
+        'rnn_c1r2':load_datasets.load_rnn_c1r2(),
+    }
 
 
 def write_log(log_file,trial,corr):
@@ -204,6 +213,7 @@ def write_log(log_file,trial,corr):
 
 
 
+
 def main():
     if not os.path.exists(log_dir):os.mkdir(log_dir)
     
@@ -217,8 +227,9 @@ def main():
 
     dataset_list = [
         load_c1r2,
-    ]
+    ]#Could expand this later
 
+    results = pd.DataFrame()
     for model in model_list:
         for dataset_function in dataset_list:
             _,_,dataset_name = dataset_function(0)
@@ -235,19 +246,44 @@ def main():
             study = optuna.create_study(
                 study_name=study_name,
                 storage=storage,
-                sampler = optuna.samplers.TPESampler(),
-                direction='maximize'
+                sampler = optuna.samplers.TPESampler(seed=13),
+                direction='maximize',
             )
-
+            
             study.optimize(
                 lambda trial: task_wrapper(
                     optunamodel=model,
                     trial=trial,
                     load_dataset=dataset_function
                 ),
-                n_trials=10
+                n_trials=50
             )
 
+            params = study.best_params
+            test_data = load_c1r2_data()
+
+            for fraction in np.linspace(0.2,1,5):
+                for k in test_data:
+                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"model_name"]=model.get_model_name()
+                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"test_set"]=k
+                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"fraction"]=fraction
+                
+                for replicate in range(REPLICATES_PER_TRIAL):
+                    final_model = model.new_model(params)
+                    train_data,val_data,dataset_name = dataset_function(-replicate)
+                    train_data = train_data.take_fraction(fraction)
+                    final_model = train_model(final_model,train_data,val_data,params['start_lr'],params['epochs'])
+                    final_model.use_ramcache(False)
+                    
+                    for k in test_data:
+                        print("{}_{}_{}, {}".format(model.get_model_name(),k,str(fraction)[:3],replicate))
+                        data_set = test_data[k]
+                        x = train.get_model_pred(final_model,eval_data=data_set,batch_size=128).cpu()
+                        y = np.array(data_set.is_viable).astype(int)
+                        auc = roc_auc_score(y,x)
+                        results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),replicate]=auc
+                
+                results.to_csv('optuna_results.csv')
 
 
 if __name__=="__main__":

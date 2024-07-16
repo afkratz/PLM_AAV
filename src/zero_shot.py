@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
+
 """
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
+OptiProt Academic License
 zero_shot.py
 --------------------------------------------------------------------------------
 """
-
-from pathlib import Path
 
 import torch
 
@@ -37,6 +36,6 @@ class PLLZeroShot():
             for i in range(0,len(seqs),batch_size):
                 bar.next(batch_size)
                 sub_seqs = seqs[i:i+batch_size]
-                _,_,pll = self.encoder.encode(sub_seqs)
+                _,_,_,pll = self.encoder.encode(sub_seqs,return_reps=False,return_averaged_reps=False,return_token_pll=False,return_total_pll=True)
                 plls.append(pll)
             return torch.cat(plls)

@@ -4,22 +4,10 @@
 --------------------------------------------------------------------------------
 Copyright 2023 Benjamin Alexander Albert [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-TODO License
+OptiProt Academic License
 layers.py
 --------------------------------------------------------------------------------
 """
-
-# -*- coding: utf-8 -*-
-
-"""
---------------------------------------------------------------------------------
-Copyright 2023 Benjamin Alexander Albert [Alejandro Chavez Lab at UCSD]
-All Rights Reserved
-TODO License
-layers.py
---------------------------------------------------------------------------------
-"""
-
 
 from typing import Iterable, Union
 
