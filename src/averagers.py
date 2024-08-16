@@ -11,9 +11,16 @@ averagers.py
 
 import torch
 
+import esm
+if esm.__version__[0]=='2':
+    from . import esm2_enc as esm_enc
+elif esm.__version__[0]=='3':
+    from . import esm3_enc as esm_enc
+
+
 from .layers import DenseBlock
 
-from . import esm_enc
+
 
 from typing import List
 
@@ -31,19 +38,25 @@ class SimpleAverager(torch.nn.Module):
             **kwargs,
                  ):
         super().__init__()
+
         self.encoder=esm_enc.ESM_Encoder(encoder_name)
+
+
         self.use_pll = use_pll
         self.embed_dim = self.encoder.embed_dim + int(use_pll)
+        self.bn = torch.nn.BatchNorm1d(self.embed_dim)
 
     def forward(self,x:List[str])->torch.tensor:
         _,averaged_reps,_,total_pll = self.encoder.encode(x,return_reps=False,return_averaged_reps=True,return_token_pll=False,return_total_pll=self.use_pll)
         if self.use_pll:
-            return torch.cat((averaged_reps,total_pll),dim=-1)
+            return self.bn(torch.cat((averaged_reps,total_pll),dim=-1))
         else:
-            return averaged_reps
+            return self.bn(averaged_reps)
     
     def to(self,dev):
         self.encoder.to(dev)
+        self.bn.to(dev)
+
         
 class LearnableAverager(torch.nn.Module):
     """
@@ -64,10 +77,11 @@ class LearnableAverager(torch.nn.Module):
             **kwargs
                  ):
         super().__init__()
-        self.encoder =esm_enc.ESM_Encoder(encoder_name)
+        self.encoder=esm_enc.ESM_Encoder(encoder_name)
         self.use_total_pll=use_total_pll
         self.use_token_pll=use_token_pll
         in_features = self.encoder.embed_dim + int(use_token_pll)
+
 
         self.pre_average_transform = torch.nn.Linear(
             in_features=in_features,
@@ -76,11 +90,14 @@ class LearnableAverager(torch.nn.Module):
         )
 
         total_output_features = averager_output_dim + int(use_total_pll)
+        
         self.embed_dim = total_output_features
+        self.bn = torch.nn.BatchNorm1d(self.embed_dim)
 
     def to(self,dev):
         self.pre_average_transform.to(dev)
         self.encoder.to(dev)
+        self.bn.to(dev)
 
     def forward(self,x:List[str])->torch.tensor:
         token_reps,_,token_pll,total_pll = self.encoder.encode(x,
@@ -101,7 +118,7 @@ class LearnableAverager(torch.nn.Module):
         if self.use_total_pll:
             output = torch.cat((output,total_pll),dim=-1)
 
-        return output
+        return self.bn(output)
     
 
 class SimpleAveragerDense(torch.nn.Module):

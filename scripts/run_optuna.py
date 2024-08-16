@@ -175,6 +175,7 @@ def task_wrapper(
 
 
 def load_c1r2(replicate:int)->Tuple[dataset.dms_dataset,dataset.dms_dataset,str]:
+    #Returns a training set of only 1000 points instead of the previous 
     c1 = load_datasets.load_c1()
     r2 = load_datasets.load_r2()
     r10 = load_datasets.load_r10()
@@ -187,6 +188,26 @@ def load_c1r2(replicate:int)->Tuple[dataset.dms_dataset,dataset.dms_dataset,str]
     train_data = c1.copy()
     train_data.extend(r2)
     return (train_data,val_data,'c1r2')
+
+def load_c1r2_small(replicate:int)->Tuple[dataset.dms_dataset,dataset.dms_dataset,str]:
+    #Returns a training set of only 1000 points instead of the previous 
+    c1 = load_datasets.load_c1()
+    r2 = load_datasets.load_r2()
+    r10 = load_datasets.load_r10()
+    c1.shuffle(replicate)
+    r2.shuffle(replicate)
+    r10.shuffle(replicate)
+    
+    val_data,_ = r10.split_at_n(1977)#Hold out 1,977 randoms from 2-10 as validation
+    r2,_ = r2.split_at_n(1756)
+    train_data = c1.copy()
+    train_data.extend(r2)
+    train_data.shuffle(replicate)
+    train_data,_ = train_data.split_at_n(1000)
+    return (train_data,val_data,'c1r2_small')
+
+
+
 
 def load_c1r2_data()->Dict[str,dataset.dms_dataset]:
     return{
@@ -219,14 +240,15 @@ def main():
     
     model_list = [
         OptunaSAV(use_pll=False,model_name='SAV_NoPLL'),
-        OptunaSAV(use_pll=True,model_name='SAV_PLL'),
+        #OptunaSAV(use_pll=True,model_name='SAV_PLL'),
         OptunaLAV(use_token_pll=False,use_total_pll=False,model_name='LAV_NoPLL'),
-        OptunaLAV(use_token_pll=False,use_total_pll=True, model_name='LAV_TotalPLL'),
-        OptunaLAV(use_token_pll=True, use_total_pll=False,model_name='LAV_TokenPLL'),
+        #OptunaLAV(use_token_pll=False,use_total_pll=True, model_name='LAV_TotalPLL'),
+        #OptunaLAV(use_token_pll=True, use_total_pll=False,model_name='LAV_TokenPLL'),
     ]
 
     dataset_list = [
         load_c1r2,
+        load_c1r2_small,
     ]#Could expand this later
 
     results = pd.DataFrame()
@@ -248,25 +270,27 @@ def main():
                 storage=storage,
                 sampler = optuna.samplers.TPESampler(seed=13),
                 direction='maximize',
+                load_if_exists=True
             )
-            
+
             study.optimize(
                 lambda trial: task_wrapper(
                     optunamodel=model,
                     trial=trial,
                     load_dataset=dataset_function
                 ),
-                n_trials=50
+                n_trials=100 - len(study.trials)#In case we're resuming, this saves us from having to redo them
             )
 
             params = study.best_params
             test_data = load_c1r2_data()
 
             for fraction in np.linspace(0.2,1,5):
-                for k in test_data:
-                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"model_name"]=model.get_model_name()
-                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"test_set"]=k
-                    results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),"fraction"]=fraction
+                for test_data_name in test_data:
+                    results.at["{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]),"model_name"]=model.get_model_name()
+                    results.at["{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]),"training_set"]=dataset_name
+                    results.at["{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]),"test_set"]=test_data_name
+                    results.at["{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]),"fraction"]=fraction
                 
                 for replicate in range(REPLICATES_PER_TRIAL):
                     final_model = model.new_model(params)
@@ -275,15 +299,15 @@ def main():
                     final_model = train_model(final_model,train_data,val_data,params['start_lr'],params['epochs'])
                     final_model.use_ramcache(False)
                     
-                    for k in test_data:
-                        print("{}_{}_{}, {}".format(model.get_model_name(),k,str(fraction)[:3],replicate))
-                        data_set = test_data[k]
+                    for test_data_name in test_data:
+                        print("{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]))
+                        data_set = test_data[test_data_name]
                         x = train.get_model_pred(final_model,eval_data=data_set,batch_size=128).cpu()
                         y = np.array(data_set.is_viable).astype(int)
                         auc = roc_auc_score(y,x)
-                        results.at["{}_{}_{}".format(model.get_model_name(),k,str(fraction)[:3]),replicate]=auc
+                        results.at["{}_{}_{}_{}".format(model.get_model_name(),dataset_name,test_data_name,str(fraction)[:3]),replicate]=auc
                 
-                results.to_csv('optuna_results.csv')
+                results.to_csv('optuna_results_batchnorm.csv')
 
 
 if __name__=="__main__":

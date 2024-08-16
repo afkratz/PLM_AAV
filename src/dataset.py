@@ -4,7 +4,7 @@
 --------------------------------------------------------------------------------
 Copyright 2023 Alexander Kratz [Alejandro Chavez Lab at UCSD]
 All Rights Reserved
-optOptiProt Academic License
+OptiProt Academic License
 dataset.py
 --------------------------------------------------------------------------------
 """

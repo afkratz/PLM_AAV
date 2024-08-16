@@ -28,9 +28,12 @@ Supports extracting three different types of embeddings from ESM:
         in the PLMs "opinion". Low values often correlate to non-functional
         proteins.
 """
-
-import torch
 import esm
+
+if esm.__version__[0]!='2':
+    raise ValueError("This code needs to be run in an environment with esm2 installed")
+    
+import torch
 from . import tensorcache
 
 from pathlib import Path
