@@ -17,7 +17,7 @@ if esm.__version__[0]!='3':
     raise ValueError("This code needs to be run in an environment with esm3 installed")
 
 from huggingface_hub import login
-key = "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"#input("Enter huggingface key:")
+key = input("Enter huggingface key:")
 login(key)
 
 import torch
